@@ -7,3 +7,6 @@ datasets==5.1.0
 torchcodec==0.17.0
 pytorch-lightning==2.6.6
 peft==0.21.2
+torchaudio==2.11.0
+silero-vad==6.2.3
+logger==1.4
