@@ -253,7 +253,8 @@ class Transcriber:
 
 
     def transcribe_file(
-            self, audio_input: Any,
+            self,
+            audio_input: Any,
             overlap_seconds: float = 0.5,
             **generation_kwargs
     ) -> Iterator[Dict[str, Any]]:
@@ -323,9 +324,6 @@ class Transcriber:
             generation_kwargs=generation_kwargs
         )
 
-    # =========================================================================
-    # LIFECYCLE CLEANUP METHOD
-    # =========================================================================
     async def close(self, timeout_s: float = 5.0):
         """
         Gracefully terminates the background queue processor worker task.
