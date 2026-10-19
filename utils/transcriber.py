@@ -198,10 +198,17 @@ class Transcriber:
             feat_tensor = features_dict["input_features"]
             if not isinstance(feat_tensor, torch.Tensor):
                 feat_tensor = torch.tensor(feat_tensor)
+
+            while feat_tensor.ndim > 2 and feat_tensor.shape[0] == 1:
+                feat_tensor = feat_tensor.squeeze(0)
+                
+            if feat_tensor.ndim != 2:
+                raise ValueError(f"Feature tensor shape must scale to 2D, got: {feat_tensor.shape}")
+                
             all_features.append(feat_tensor)
             
         stacked_features = torch.stack(all_features).to(self.device)
-        base_kwargs = batch.generation_kwargs.copy()
+        base_kwargs = batch[0].generation_kwargs.copy()
         
         has_prefixes = any(req.prefix_tokens for req in batch)
         if has_prefixes:
@@ -220,7 +227,7 @@ class Transcriber:
             base_kwargs["prompt_ids"] = torch.tensor(padded_prefixes).to(self.device)
 
         with torch.no_grad():
-            predicted_ids = self.model.generate(stacked_features, **base_kwargs)
+            predicted_ids = self.model.transformer.generate(input_features=stacked_features, **base_kwargs)
             
         predicted_list = predicted_ids.tolist()
         
@@ -230,11 +237,13 @@ class Transcriber:
                 prefix_len = len(padded_prefixes[idx])
                 if len(row_tokens) > prefix_len:
                     row_tokens = row_tokens[prefix_len:]
+
+            row_tokens = [int(t) for t in row_tokens]
                     
             transcription = self.audio_engine.processor.batch_decode(
                 [row_tokens], skip_special_tokens=True
             )
-            req.result_text = transcription.strip() if transcription else ""
+            req.result_text = transcription[0].strip() if transcription else ""
             req.result_tokens = row_tokens
             req.event.set()
 
@@ -291,17 +300,22 @@ class Transcriber:
                 kwargs["prompt_ids"] = torch.tensor([truncated_history]).to(self.device)
                 
             with torch.no_grad():
-                predicted_ids = self.model.generate(input_features, **kwargs)
+                predicted_ids = self.model.transformer.generate(input_features=input_features, **kwargs)
             
             new_tokens = predicted_ids.tolist()
             if truncated_history and len(new_tokens) > len(truncated_history):
                 new_tokens = new_tokens[len(truncated_history):]
                 
-            transcription = self.audio_engine.processor.batch_decode([new_tokens], skip_special_tokens=True)
-            text = transcription.strip() if transcription else ""
+            if isinstance(new_tokens[0], list):
+                new_tokens = new_tokens[0]
+                
+            clean_tokens = [int(t) for t in new_tokens]
+                
+            transcription = self.audio_engine.processor.batch_decode([clean_tokens], skip_special_tokens=True)
+            text = transcription[0].strip() if (transcription and transcription[0]) else ""
             
             if text:
-                history_tokens.extend(new_tokens)
+                history_tokens.extend(clean_tokens)
                 yield {
                     "text": text,
                     "start": round(chunk["start"], 2),

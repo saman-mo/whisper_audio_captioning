@@ -4,7 +4,7 @@ from transformers import WhisperForConditionalGeneration, WhisperProcessor
 import torch
 
 from models.model import AudioTranscriber
-from audio_engine import UnifiedAudioEngine
+from utils.audio_engine import UnifiedAudioEngine
 
 
 def model_processor_audio_engine_factory(

@@ -10,3 +10,6 @@ peft==0.21.2
 torchaudio==2.11.0
 silero-vad==6.2.3
 logger==1.4
+hydra-core==1.4.0rc1
+fastapi==0.148.0
+uvicorn==0.54.0

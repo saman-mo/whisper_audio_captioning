@@ -50,8 +50,8 @@ class AudioTranscriber(L.LightningModule):
 
         self.batch_size = None
         
-        self.val_wer_score = WordErrorRate(keep_punctuations=False, lowercase=False)
-        self.test_wer_score = WordErrorRate(keep_punctuations=False, lowercase=False)
+        self.val_wer_score = WordErrorRate()
+        self.test_wer_score = WordErrorRate()
         self.val_cer_score = CharErrorRate()
         self.test_cer_score = CharErrorRate()
 
