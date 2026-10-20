@@ -1,0 +1,32 @@
+pretianed_whisper_path: 'openai/whisper-small'
+learning_rate: 1e-4
+
+lora_config:
+  r: 32                                
+  lora_alpha: 64                      
+  target_modules: "all-linear"        
+  lora_dropout: 0.05                  
+  bias: "none"
+  task_type: "SEQ_2_SEQ_LM"
+
+redis:
+  # Uses the REDIS_HOST env var inside Docker, or defaults to "localhost" for local host runs
+  host: ${oc.env:REDIS_HOST, "localhost"}
+  port: 6379
+  db: 0
+  decode_responses: true
+
+summarizer:
+  # Set to "local" to point to your detached internal cluster Llama engine (Ollama)
+  # Set to "external_api" to point to cloud services like OpenAI
+  engine_type: "local"
+  # Tracks internal container DNS bridges dynamically when spawned under compose
+  local_api_endpoint: ${oc.env:SUMMARIZER_LOCAL_API_ENDPOINT, "http://localhost:11434/v1"}
+  local_model_name: "llama3.2"
+
+  # When engine_type is "external_api", point to a third-party cloud platform
+  external_api_endpoint: "https://openai.com"
+  external_api_key: "for later sk-proj-your-secret-key"
+  external_model_name: "gpt-4o-mini"
+
+  max_tokens: 512

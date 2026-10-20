@@ -13,3 +13,6 @@ logger==1.4
 hydra-core==1.4.0rc1
 fastapi==0.148.0
 uvicorn==0.54.0
+pydantic==2.14.1
+redis==8.1.0
+httpx==0.28.1

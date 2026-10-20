@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # 1. DISTRIBUTED CACHE LAYER (REDIS) - Consumes NO host/network env vars
+  # =========================================================================
+  redis_cache:
+    image: redis:7-alpine
+    container_name: whisper_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # =========================================================================
+  # 2. LOCAL LLM INFERENCE SERVER LAYER (OLLAMA / LLAMA)
+  # =========================================================================
+  llama_inference_server:
+    image: ollama/ollama:latest
+    container_name: local_llama_server
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    restart: always
+
+  # =========================================================================
+  # 3. HIGH-CONCURRENCY WHISPER BACKEND APP LAYER (FASTAPI)
+  # =========================================================================
+  whisper_backend:
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile 
+    container_name: whisper_fastapi_backend
+    ports:
+      - "8000:8000"
+    environment:
+      # ONLY the app container receives the network bridge routing parameters
+      - REDIS_HOST=redis_cache
+      - SUMMARIZER_LOCAL_API_ENDPOINT=http://llama_inference_server:11434/v1
+    depends_on:
+      - redis_cache
+      - llama_inference_server
+    restart: always
+
+volumes:
+  ollama_storage:
