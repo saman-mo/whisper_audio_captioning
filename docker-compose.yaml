@@ -7,8 +7,10 @@ services:
   redis_cache:
     image: redis:7-alpine
     container_name: whisper_redis
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
+    networks:
+      - whisper_mesh
     restart: always
 
   # =========================================================================
@@ -17,10 +19,12 @@ services:
   llama_inference_server:
     image: ollama/ollama:latest
     container_name: local_llama_server
-    ports:
-      - "11434:11434"
+    expose:
+      - "11434"
     volumes:
       - ollama_storage:/root/.ollama
+    networks:
+      - whisper_mesh
     restart: always
 
   # =========================================================================
@@ -37,10 +41,26 @@ services:
       # ONLY the app container receives the network bridge routing parameters
       - REDIS_HOST=redis_cache
       - SUMMARIZER_LOCAL_API_ENDPOINT=http://llama_inference_server:11434/v1
+      # Overrides mapping cleanly to Hydra parameter configurations
+      - WS_ENFORCE_TOKEN_AUTH=false
+      - WS_MAX_CHUNK_SIZE_BYTES=524288
+      - JWT_JWKS_URL=https://your-idp-domain.com
+      - JWT_AUDIENCE=https://enterprise.com
+      - JWT_ISSUER=https://your-idp-domain.com
+      - LLM_TEMPERATURE=0.3
+      - LLM_MAX_RETRIES=3
+      - LLM_INITIAL_BACKOFF=1.0
+      - LLM_TIMEOUT_SECONDS=30.0
     depends_on:
       - redis_cache
       - llama_inference_server
+    networks:
+      - whisper_mesh
     restart: always
+
+networks:
+  whisper_mesh:
+    driver: bridge
 
 volumes:
   ollama_storage:

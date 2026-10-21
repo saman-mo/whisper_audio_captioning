@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, Request, status, Depends
+
 from schemas import SearchResponse, SummarizeRequest, SummarizeResponse
 from utils import TranscriptionService
+from utils import InferenceEngineException
+
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
 
@@ -18,8 +21,9 @@ async def search_session_transcript(
     service: TranscriptionService = Depends(get_transcription_service)
 ):
     """
-    Distributed search cluster endpoint. Scans a live conversation transcript 
-    by session across any instance node via distributed memory maps.
+    Unified search cluster endpoint. Scans conversation transcript segments 
+    by session ID across any distributed cluster node for both real-time streams 
+    and processed offline files.
     """
     try:
         matches = await service.search_transcript(session_id=session_id, query=q)
@@ -42,16 +46,38 @@ async def search_session_transcript(
         )
 
 
+
 @router.post("/{session_id}/summarize", response_model=SummarizeResponse, status_code=status.HTTP_200_OK)
 async def summarize_session_transcript(
     session_id: str,
     payload: SummarizeRequest,
     service: TranscriptionService = Depends(get_transcription_service)
 ):
+    """
+    Unified abstractive text summarization endpoint. Chronologically extracts 
+    historical text segments from the session cache and prompts the downstream 
+    NLP engine to generate structured summaries for live streams or offline files.
+    """
     try:
         summary_text = await service.summarize_transcript(session_id=session_id, format_type=payload.format.value)
         return SummarizeResponse(session_id=session_id, summary=summary_text)
+        
     except KeyError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Session text arrays for {session_id} not found or expired.")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Core inference processing execution exception: {str(e)}")
+        # Catch missing, expired, or uninitialized cache sessions
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Session text arrays for {session_id} not found or expired."
+        )
+    except InferenceEngineException as inference_err:
+        # INTERCEPT CUSTOM INFERENCE FAULT: Map it to an explicit HTTP 502 Bad Gateway response layout
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Downstream LLM Cluster Failure: {str(inference_err)}"
+        )
+    except Exception as general_err:
+        # Catch true application failures or unhandled exceptions
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Core inference processing execution exception: {str(general_err)}"
+        )
+        

@@ -19,6 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+
+# Create a secure, isolated non-root system application user and group
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -m -s /bin/bash appuser    
+
+
 # Upgrade pip to the latest production version
 RUN pip3 install --no-cache-dir --upgrade pip
 
@@ -29,6 +35,12 @@ RUN pip3 install --no-cache-dir -r requirements.txt --extra-index-url https://do
 
 # Copy the rest of your application code into the workspace
 COPY ./app .
+
+# Grant full ownership of the application directory to the non-root application user
+RUN chown -R appuser:appgroup /app
+
+# Switch container context permanently away from root execution privileges
+USER appuser
 
 # Expose the default FastAPI port
 EXPOSE 8000

@@ -27,6 +27,7 @@ class TranscriptionService:
         self.transcriber = None
         self.redis: aioredis.Redis = None
         self.summarizer: Optional[SummarizationEngine] = None
+        self.config = None
 
     async def initialize(self):
         """Asynchronously triggers lazy loading framework factories on application startup."""
@@ -35,6 +36,8 @@ class TranscriptionService:
         # Safe configuration loading targeting your explicit utils/ directory structure
         with initialize_config_dir(config_dir=self.config_dir, version_base=None):
             cfg = compose(config_name="config.yaml")
+
+        self.config = cfg
 
         self.redis = aioredis.Redis(
             host=cfg.redis.host,
@@ -95,15 +98,16 @@ class TranscriptionService:
 
     async def save_segment(self, session_id: str, segment: Dict[str, Any]):
         """
-        Appends a newly finalized Whisper segment into Redis with an automatic 
-        rolling 2-hour memory expiration (TTL) window.
+        Appends a newly finalized Whisper segment into Redis atomically using List primitives.
+        Enforces a rolling 2-hour memory expiration (TTL) window on the session workspace key.
         """
-        raw_data = await self.redis.get(session_id)
-        segments = json.loads(raw_data) if raw_data else []
+        key = f"session:{session_id}"
         
-        segments.append(segment)
+        # Atomically push the serialized segment JSON onto the tail of the list
+        await self.redis.rpush(key, json.dumps(segment))
         
-        await self.redis.setex(name=session_id, time=7200, value=json.dumps(segments))
+        # Ensure the entire list maintains a rolling 2-hour expiration window from the last write
+        await self.redis.expire(key, 7200)
 
 
     async def search_transcript(self, session_id: str, query: str) -> List[Dict[str, Any]]:
@@ -111,16 +115,20 @@ class TranscriptionService:
         Queries Redis distributed node, executes deep case-insensitive evaluations,
         and derives localized character offset configurations.
         """
-        raw_data = await self.redis.get(session_id)
+        key = f"session:{session_id}"
         
-        if raw_data is None:
+        # Retrieve all elements from the atomic list cleanly
+        raw_elements = await self.redis.lrange(key, 0, -1)
+        
+        # Explicitly check if the key exists to catch missing or expired sessions correctly
+        if not raw_elements and not await self.redis.exists(key):
             raise KeyError(f"Session {session_id} not found in the live cluster memory.")
 
-        segments = json.loads(raw_data)
         results = []
         clean_query = query.strip().lower()
         
-        for index, segment in enumerate(segments):
+        for index, raw_item in enumerate(raw_elements):
+            segment = json.loads(raw_item)
             text = segment.get("text", "")
             text_lower = text.lower()
             
@@ -138,16 +146,20 @@ class TranscriptionService:
         return results
 
     async def summarize_transcript(self, session_id: str, format_type: str) -> str:
-        """Fetches complete context history lines from Redis cache and forwards data to the NLP Engine."""
-        raw_data = await self.redis.get(session_id)
-        if raw_data is None:
+        """Fetches the complete context history list from Redis cache and forwards data to the NLP Engine."""
+        key = f"session:{session_id}"
+        
+        # Extract the chronological list arrays from the database segment
+        raw_elements = await self.redis.lrange(key, 0, -1)
+        
+        if not raw_elements and not await self.redis.exists(key):
             raise KeyError(f"Session {session_id} not found in the live cluster memory.")
 
-        segments = json.loads(raw_data)
-        if not segments:
+        if not raw_elements:
             return "No text contents found inside database cache storage to execute an evaluation summary."
 
-        # Bind chronological array text segments into an unified single text payload context block
+        # Reconstruct the text collection sequentially from the atomic list items
+        segments = [json.loads(item) for item in raw_elements]
         full_conversation_text = " ".join([seg.get("text", "").strip() for seg in segments])
         
         if not self.summarizer:

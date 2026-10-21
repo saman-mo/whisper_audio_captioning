@@ -1,4 +1,4 @@
 from .model_processor_audio_engine_factory import model_processor_audio_engine_factory
 from .transcriber import Transcriber
-from .summarization_engine import SummarizationEngine
+from .summarization_engine import SummarizationEngine, InferenceEngineException
 from .transcription_service import TranscriptionService

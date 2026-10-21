@@ -30,3 +30,20 @@ summarizer:
   external_model_name: "gpt-4o-mini"
 
   max_tokens: 512
+
+  temperature: ${oc.decode:${oc.env:LLM_TEMPERATURE, "0.3"}}
+  max_retries: ${oc.decode:${oc.env:LLM_MAX_RETRIES, "3"}}
+  initial_backoff_seconds: ${oc.decode:${oc.env:LLM_INITIAL_BACKOFF, "1.0"}}
+  timeout_seconds: ${oc.decode:${oc.env:LLM_TIMEOUT_SECONDS, "30.0"}}
+
+  # =========================================================================
+# SECURITY & CONCURRENCY CONSTRAINTS LAYER (ZERO-TRUST COMPLIANT)
+# =========================================================================
+security:
+  max_chunk_size_bytes: ${oc.decode:${oc.env:WS_MAX_CHUNK_SIZE_BYTES, "524288"}}
+  enforce_token_auth: ${oc.decode:${oc.env:WS_ENFORCE_TOKEN_AUTH, "false"}}
+  
+  # OAuth2 Authorization Server Context Configuration 
+  jwks_url: ${oc.env:JWT_JWKS_URL, "https://your-idp-domain.com"}
+  audience: ${oc.env:JWT_AUDIENCE, "https://enterprise.com"}
+  issuer: ${oc.env:JWT_ISSUER, "https://your-idp-domain.com"}
