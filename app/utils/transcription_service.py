@@ -72,7 +72,8 @@ class TranscriptionService:
 
         self.transcriber = Transcriber(
             whisper_model=self.model,
-            audio_engine=self.audio_engine
+            audio_engine=self.audio_engine,
+            config=self.config
         )
 
     def run_offline(self, file_path: str, **kwargs) -> Iterator[Dict[str, Any]]:
@@ -91,6 +92,8 @@ class TranscriptionService:
         """Drains outstanding execution queue tasks gracefully during framework teardown."""
         if self.transcriber:
             await self.transcriber.close(timeout_s=timeout_s)
+        if self.summarizer:
+            await self.summarizer.close()
         if self.redis:
             await self.redis.close()
             print("Redis connection cluster closed cleanly.")
@@ -102,12 +105,19 @@ class TranscriptionService:
         Enforces a rolling 2-hour memory expiration (TTL) window on the session workspace key.
         """
         key = f"session:{session_id}"
-        
-        # Atomically push the serialized segment JSON onto the tail of the list
-        await self.redis.rpush(key, json.dumps(segment))
-        
-        # Ensure the entire list maintains a rolling 2-hour expiration window from the last write
-        await self.redis.expire(key, 7200)
+
+        try:
+            # Atomically push the serialized segment JSON onto the tail of the list
+            await self.redis.rpush(key, json.dumps(segment))
+            
+            # Ensure the entire list maintains a rolling 2-hour expiration window from the last write
+            await self.redis.expire(key, 7200)
+        except aioredis.exceptions.ResponseError as redis_err:
+            if "OOM" in str(redis_err):
+                print(f"[Cluster Alert] Redis cache memory limits exceeded! Failed to write session: {session_id}")
+                raise MemoryError("Cache cluster storage capacity reached. Deep transcript persistence failed.")
+            raise redis_err
+
 
 
     async def search_transcript(self, session_id: str, query: str) -> List[Dict[str, Any]]:

@@ -1,3 +1,4 @@
 .venv
 *.flac
 __pycache__/
+*.wav

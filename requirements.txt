@@ -1,12 +1,9 @@
-torch==2.14.1+cu126
 torchmetrics==1.9.0
 transformers==5.19.0
 uv==0.13.0
 datasets==5.1.0
-torchcodec==0.17.0
-pytorch-lightning==2.6.6
+lightning==2.6.6
 peft==0.21.2
-torchaudio==2.11.0
 silero-vad==6.2.3
 logger==1.4
 hydra-core==1.4.0rc1
@@ -16,3 +13,5 @@ pydantic==2.14.1
 redis==8.1.0
 httpx==0.28.1
 python-jose[cryptography]==3.3.0
+websockets
+soundfile

@@ -9,6 +9,7 @@ services:
     container_name: whisper_redis
     expose:
       - "6379"
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
     networks:
       - whisper_mesh
     restart: always
@@ -38,11 +39,13 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - PYTHONUNBUFFERED=1
       # ONLY the app container receives the network bridge routing parameters
       - REDIS_HOST=redis_cache
       - SUMMARIZER_LOCAL_API_ENDPOINT=http://llama_inference_server:11434/v1
       # Overrides mapping cleanly to Hydra parameter configurations
       - WS_ENFORCE_TOKEN_AUTH=false
+      - WHISPER_DEVICE=cpu
       - WS_MAX_CHUNK_SIZE_BYTES=524288
       - JWT_JWKS_URL=https://your-idp-domain.com
       - JWT_AUDIENCE=https://enterprise.com

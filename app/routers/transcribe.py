@@ -101,6 +101,11 @@ async def transcribe_file(
             session_id=session_id,
             segments=results
         )
+    except MemoryError as memory_fault:
+        raise HTTPException(
+            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+            detail=f"Database storage capacity limit exceeded: {str(memory_fault)}"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -162,7 +167,12 @@ async def transcribe_stream(
                         is_final_flush=result.get("is_final_flush", False)
                     )
                     await websocket.send_json(validated_segment.model_dump())
-                    await service.save_segment(session_id=session_id, segment=result)
+                    try:
+                        await service.save_segment(session_id=session_id, segment=result)
+                    except MemoryError:
+                        print(f"Terminating stream session {session_id} due to host OOM.")
+                        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+                        break
                     
     except WebSocketDisconnect:
         print(f"Clean disconnection processed for session: {session_id}")

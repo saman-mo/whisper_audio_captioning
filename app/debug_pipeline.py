@@ -2,7 +2,9 @@ import os
 import torch
 import asyncio
 import numpy as np
-from main import service
+from main import TranscriptionService, CONFIG_DIR
+
+service = TranscriptionService(config_dir=CONFIG_DIR)
 
 async def debug_offline_pipeline():
     """Runs a target test on the offline generator pipeline layer."""

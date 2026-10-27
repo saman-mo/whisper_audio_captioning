@@ -1,4 +1,3 @@
-
 FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
 
 # Set system-level environment flags
@@ -31,7 +30,9 @@ RUN pip3 install --no-cache-dir --upgrade pip
 # Copy only requirements first to leverage Docker build cache layers
 COPY requirements.txt .
 
-RUN pip3 install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
+RUN pip3 install --no-cache-dir torch torchaudio torchcodec --index-url https://download.pytorch.org/whl/cu126
+
+RUN pip3 install --no-cache-dir -r requirements.txt 
 
 # Copy the rest of your application code into the workspace
 COPY ./app .

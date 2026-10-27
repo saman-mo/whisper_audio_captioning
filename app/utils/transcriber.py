@@ -128,8 +128,8 @@ class Transcriber:
             max_batch_size: int = 8,
             batch_timeout_second: float = 0.05,
             pad_token_id: int = 50257,
-            num_token_history: int = 200
-
+            num_token_history: int = 200,
+            config: Any = None
     ):
         if whisper_model is None:
             raise AttributeError("WhisperForConditionalGeneration model is not provided!")
@@ -138,10 +138,13 @@ class Transcriber:
         if audio_engine is None:
             raise AttributeError("Audio Engine is needed for processing the audio data and mut be provided!")
         self.audio_engine = audio_engine
-        self.device = getattr(
-            whisper_model,
-            "device", torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        
+        config_device = "cpu"
+        if config and config.hardware.device_type:
+            config_device = config.hardware.device_type
+            
+        self.device = torch.device(config_device)
+        print(f"[Hydra Core Hardware Locked]: Operating on -> {self.device}")
 
         self.queue: asyncio.Queue[BatchRequest] = asyncio.Queue()
         self.max_batch_size = max_batch_size
@@ -207,7 +210,12 @@ class Transcriber:
                 
             all_features.append(feat_tensor)
             
-        stacked_features = torch.stack(all_features).to(self.device)
+        stacked_features = torch.stack(all_features)
+
+        if self.device.type != 'cpu':
+            stacked_features = stacked_features.pin_memory()
+            stacked_features = stacked_features.to(self.device, non_blocking=True)
+
         base_kwargs = batch[0].generation_kwargs.copy()
         
         has_prefixes = any(req.prefix_tokens for req in batch)

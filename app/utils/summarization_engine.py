@@ -31,9 +31,22 @@ class SummarizationEngine:
         self.initial_backoff = cfg.summarizer.initial_backoff_seconds
         self.timeout = cfg.summarizer.timeout_seconds
 
+        self.client: httpx.AsyncClient = None
+
     async def initialize(self):
         """Validates configuration parameters and engine readiness on container bootstrap."""
         print(f"[Summarizer Startup] Initializing framework as [{self.engine_type.upper()}] mode strategy...")
+        self.client = httpx.AsyncClient(
+            limits=httpx.Limits(max_keepalive_connections=50, max_connections=100)
+        )
+
+
+    async def close(self):
+        """Gracefully closes the persistent HTTPX connection pool."""
+        if self.client:
+            await self.client.aclose()
+            print("[Summarizer Teardown] HTTPX connection pool closed cleanly.")
+    
 
     async def generate_summary(self, text: str, format_type: str) -> str:
         """Processes raw text collections and maps execution paths based on current strategies."""
@@ -65,6 +78,11 @@ class SummarizationEngine:
         Sends an abstractive text processing instruction to an OpenAI-compatible API schema server.
         Implements transient error retries with exponential backoff and random jitter.
         """
+
+
+        if self.client is None or self.client.is_closed:
+            raise RuntimeError("SummarizationEngine HTTP client pool has not been initialized or is closed.")
+
         headers = {"Authorization": f"Bearer {api_key}"} if api_key != "none" else {}
         payload = {
             "model": model_name,
@@ -75,28 +93,27 @@ class SummarizationEngine:
         
         url = f"{endpoint.rstrip('/')}/chat/completions"
         
-        async with httpx.AsyncClient() as client:
-            for attempt in range(1, self.max_retries + 1):
-                try:
-                    response = await client.post(
-                        url, 
-                        json=payload, 
-                        headers=headers, 
-                        timeout=self.timeout
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = await self.client.post(
+                    url, 
+                    json=payload, 
+                    headers=headers, 
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"].strip()
+                
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                print(f"[Attempt {attempt}/{self.max_retries}] Inference connection issue encountered: {str(exc)}")
+                
+                if attempt == self.max_retries:
+                    raise InferenceEngineException(
+                        f"Inference cluster routing layer failed completely after {self.max_retries} attempts. Underlying error: {str(exc)}"
                     )
-                    response.raise_for_status()
-                    data = response.json()
-                    return data["choices"][0]["message"]["content"].strip()
-                    
-                except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-                    print(f"[Attempt {attempt}/{self.max_retries}] Inference connection issue encountered: {str(exc)}")
-                    
-                    if attempt == self.max_retries:
-                        raise InferenceEngineException(
-                            f"Inference cluster routing layer failed completely after {self.max_retries} attempts. Underlying error: {str(exc)}"
-                        )
-                    
-                    # Compute dynamic exponential backoff time with random jitter using parameterized configs
-                    sleep_time = (self.initial_backoff * (2 ** (attempt - 1))) + random.uniform(0, 0.5)
-                    print(f"Sleeping for {sleep_time:.2f}s before execution re-attempt...")
-                    await asyncio.sleep(sleep_time)
+                
+                # Compute dynamic exponential backoff time with random jitter using parameterized configs
+                sleep_time = (self.initial_backoff * (2 ** (attempt - 1))) + random.uniform(0, 0.5)
+                print(f"Sleeping for {sleep_time:.2f}s before execution re-attempt...")
+                await asyncio.sleep(sleep_time)

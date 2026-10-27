@@ -47,3 +47,8 @@ security:
   jwks_url: ${oc.env:JWT_JWKS_URL, "https://your-idp-domain.com"}
   audience: ${oc.env:JWT_AUDIENCE, "https://enterprise.com"}
   issuer: ${oc.env:JWT_ISSUER, "https://your-idp-domain.com"}
+
+hardware:
+# Set to "cuda" for high-performance GPU staging lines (EKS / Production)
+# Set to "cpu" for local development boundaries without graphics drivers
+  device_type: ${oc.env:WHISPER_DEVICE, "cpu"}
