@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: whisper-stack-config
+  labels:
+    app.kubernetes.io/part-of: whisper-mesh
+data:
+  WHISPER_DEVICE: "cpu"
+  WS_ENFORCE_TOKEN_AUTH: "false"
+  WS_MAX_CHUNK_SIZE_BYTES: "524288"
+  LLM_TEMPERATURE: "0.3"
+  LLM_MAX_RETRIES: "3"
+  LLM_INITIAL_BACKOFF: "1.0"
+  LLM_TIMEOUT_SECONDS: "30.0"
+  JWT_AUDIENCE: "https://enterprise.com"
+  JWT_ISSUER: "https://your-idp-domain.com"
+  JWT_JWKS_URL: "https://your-idp-domain.com"

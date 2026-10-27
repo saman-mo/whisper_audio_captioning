@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-llama-server
+  labels:
+    app: llama-inference-server
+    app.kubernetes.io/part-of: whisper-mesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llama-inference-server
+  template:
+    metadata:
+      labels:
+        app: llama-inference-server
+        app.kubernetes.io/part-of: whisper-mesh
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+          name: ollama-port
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5 && curl -X POST http://localhost:11434/api/pull -d '{\"name\": \"llama3.2\"}'"]
+        volumeMounts:
+        - name: ollama-storage
+          mountPath: /root/.ollama
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "2000m"
+          requests:
+            memory: 2Gi
+            cpu: "1000m"
+      volumes:
+      - name: ollama-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-inference-server
+  labels:
+    app.kubernetes.io/part-of: whisper-mesh
+spec:
+  ports:
+  - port: 11434
+    targetPort: ollama-port
+  selector:
+    app: llama-inference-server

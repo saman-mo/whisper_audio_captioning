@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-fastapi-backend
+  labels:
+    app: whisper-backend-srvice
+    app.kubernetes.io/part-of: whisper-mesh
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: whisper-backend-service
+  template:
+    metadata:
+      labels:
+        app: whisper-backend-service
+        app.kubernetes.io/part-of: whisper-mesh
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+      - name: backend-app
+        image: whisper-backend:local-dev
+        imagePullPolicy: Never            # Pin execution context strictly to local minikube registration cache
+        ports:
+        - containerPort: 8000
+          name: http-ws-port
+        env:
+        - name: REDIS_HOST
+          value: "redis-cache"
+        - name: SUMMARIZER_LOCAL_API_ENDPOINT
+          value: "http://llama-inference-server:11434/v1"
+        envFrom:
+        - configMapRef:
+            name: whisper-stack-config
+        readinessProbe:
+          httpGet:
+            path: /api/v1/transcribe/file  # Confirms that initialization framework dependencies are green
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/v1/transcribe/file
+            port: 8000
+          initialDelaySeconds: 45
+          periodSeconds: 15
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "2000m"
+          requests:
+            memory: 2Gi
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisper-backend-service
+  labels:
+    app.kubernetes.io/part-of: whisper-mesh
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    targetPort: http-ws-port
+    nodePort: 30080
+  selector:
+    app: whisper-backend-service

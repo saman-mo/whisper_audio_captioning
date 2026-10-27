@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-redis
+  labels:
+    app: redis-cache
+    app.kubernetes.io/part-of: whisper-mesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-cache
+  template:
+    metadata:
+      labels:
+        app: redis-cache
+        app.kubernetes.io/part-of: whisper-mesh
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
+        ports:
+        - containerPort: 6379
+          name: redis-port
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: "500m"
+          requests:
+            memory: 256Mi
+            cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cache
+  labels:
+    app.kubernetes.io/part-of: whisper-mesh
+spec:
+  ports:
+  - port: 6379
+    targetPort: redis-port
+  selector:
+    app: redis-cache
