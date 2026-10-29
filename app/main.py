@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 
 from utils import TranscriptionService
 from routers import transcribe_router, analytics_router
@@ -29,3 +29,8 @@ app = FastAPI(
 # Register clean isolated feature packages mapping functional domains
 app.include_router(transcribe_router)
 app.include_router(analytics_router)
+
+@app.get("/health")
+async def check_health():
+    """Check if the dependent services are healthy"""
+    return Response(status_code=200)

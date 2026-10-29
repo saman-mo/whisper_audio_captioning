@@ -25,7 +25,7 @@ spec:
         lifecycle:
           postStart:
             exec:
-              command: ["/bin/sh", "-c", "sleep 5 && curl -X POST http://localhost:11434/api/pull -d '{\"name\": \"llama3.2\"}'"]
+              command: ["/bin/sh", "-c", "sleep 5 && curl -X POST http://localhost:11434/api/pull -d '{\"name\": \"llama3.2\"}' &"]
         volumeMounts:
         - name: ollama-storage
           mountPath: /root/.ollama

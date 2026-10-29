@@ -10,6 +10,7 @@ eval $(minikube docker-env)
 
 echo "📦 [Minikube Orchestrator] Compiling application secure image layers..."
 # Execute context generation from workspace root containing requirements.txt
+# minikube image build -t whisper-backend:local-dev -f ./app/Dockerfile .
 docker build -t whisper-backend:local-dev -f ./app/Dockerfile .
 
 echo "⚙️ [Minikube Orchestrator] Deploying configuration assets and runtime instances..."
@@ -18,6 +19,8 @@ kubectl apply -f k8s-manifests/secret.yaml
 kubectl apply -f k8s-manifests/cache-deployment.yaml
 kubectl apply -f k8s-manifests/llm-deployment.yaml
 kubectl apply -f k8s-manifests/backend-deployment.yaml
+
+# kubectl get pods -l app.kubernetes.io/part-of=whisper-mesh -w
 
 echo "🔍 [Minikube Orchestrator] Tracking rollout status. Waiting for pods to stabilize..."
 kubectl rollout status deployment/whisper-fastapi-backend --timeout=120s

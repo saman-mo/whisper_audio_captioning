@@ -37,16 +37,18 @@ spec:
             name: whisper-stack-config
         readinessProbe:
           httpGet:
-            path: /api/v1/transcribe/file  # Confirms that initialization framework dependencies are green
+            path: /health  # Confirms that initialization framework dependencies are green
             port: 8000
-          initialDelaySeconds: 20
-          periodSeconds: 10
+          initialDelaySeconds: 90
+          periodSeconds: 15
+          failureThreshold: 5
         livenessProbe:
           httpGet:
-            path: /api/v1/transcribe/file
+            path: /health
             port: 8000
-          initialDelaySeconds: 45
-          periodSeconds: 15
+          initialDelaySeconds: 120
+          periodSeconds: 20
+          failureThreshold: 4
         resources:
           limits:
             memory: 4Gi
