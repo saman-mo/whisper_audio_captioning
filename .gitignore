@@ -2,3 +2,8 @@
 *.flac
 __pycache__/
 *.wav
+.terraform/
+terraform.tfstate.d/
+*.tfstate
+*.tfstate.*
+crash.log
